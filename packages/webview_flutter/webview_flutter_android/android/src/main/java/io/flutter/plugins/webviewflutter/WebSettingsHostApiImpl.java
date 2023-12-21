@@ -118,6 +118,7 @@ public class WebSettingsHostApiImpl implements WebSettingsHostApi {
   @Override
   public void setBuiltInZoomControls(@NonNull Long instanceId, @NonNull Boolean enabled) {
     final WebSettings webSettings = Objects.requireNonNull(instanceManager.getInstance(instanceId));
+    webSettings.setMinimumFontSize(1);
     webSettings.setBuiltInZoomControls(enabled);
   }
 

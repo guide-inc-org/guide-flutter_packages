@@ -85,7 +85,7 @@ class AndroidWebViewController extends PlatformWebViewController {
                 .fromPlatformWebViewControllerCreationParams(params)) {
     _webView.settings.setDomStorageEnabled(true);
     _webView.settings.setJavaScriptCanOpenWindowsAutomatically(true);
-    _webView.settings.setSupportMultipleWindows(true);
+    _webView.settings.setSupportMultipleWindows(false);
     _webView.settings.setLoadWithOverviewMode(true);
     _webView.settings.setUseWideViewPort(true);
     _webView.settings.setDisplayZoomControls(false);
