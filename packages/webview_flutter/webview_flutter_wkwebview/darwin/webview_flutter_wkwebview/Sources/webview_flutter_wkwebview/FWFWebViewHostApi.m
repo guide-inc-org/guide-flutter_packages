@@ -11,11 +11,28 @@
 }
 @end
 
+
+@interface ZTWkProcessPool : WKProcessPool
++ (instancetype)singleWkProcessPool;
+@end
+
+@implementation ZTWkProcessPool
++ (instancetype)singleWkProcessPool{
+    static ZTWkProcessPool *staticInstance;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        staticInstance = [[self alloc] init];
+    });
+    return staticInstance;
+}
+@end
+
 @implementation FWFWebView
 - (instancetype)initWithFrame:(CGRect)frame
                 configuration:(nonnull WKWebViewConfiguration *)configuration
               binaryMessenger:(id<FlutterBinaryMessenger>)binaryMessenger
               instanceManager:(FWFInstanceManager *)instanceManager {
+  configuration.processPool = [ZTWkProcessPool singleWkProcessPool];
   self = [self initWithFrame:frame configuration:configuration];
   if (self) {
     _objectApi = [[FWFObjectFlutterApiImpl alloc] initWithBinaryMessenger:binaryMessenger
@@ -26,6 +43,8 @@
     if (@available(iOS 13.0, *)) {
       self.scrollView.automaticallyAdjustsScrollIndicatorInsets = NO;
     }
+    self.allowsLinkPreview = NO; // disable allowsLinkPreview
+    self.scrollView.bounces = NO;
 #endif
   }
   return self;
@@ -48,10 +67,44 @@
 #endif
 }
 
+- (void)disableDragInteractions {
+    UIView *webScrollView = nil;
+    for (UIView *subview in self.subviews) {
+        if ([subview isKindOfClass:[UIScrollView class]]) {
+            webScrollView = subview;
+            break;
+        }
+    }
+    if (webScrollView) {
+        UIView *contentView = nil;
+        for (UIView *subview in webScrollView.subviews) {
+            if ([subview.interactions count] > 1) {
+                contentView = subview;
+                break;
+            }
+        }
+        if (contentView) {
+            for (id<UIInteraction> interaction in contentView.interactions) {
+                if ([interaction isKindOfClass:[UIDragInteraction class]]) {
+                    ((UIDragInteraction *)interaction).enabled = NO;
+                    break;
+                }
+            }
+        }
+    }
+}
+
 - (void)observeValueForKeyPath:(NSString *)keyPath
                       ofObject:(id)object
                         change:(NSDictionary<NSKeyValueChangeKey, id> *)change
                        context:(void *)context {
+  NSURL *oldURL = [change objectForKey:NSKeyValueChangeOldKey];
+  NSURL *newURL = [change objectForKey:NSKeyValueChangeNewKey];
+
+  if ([keyPath isEqualToString:@"URL"] && ![newURL isEqual:oldURL]) {
+      NSLog(@"URL changed from %@ to %@", oldURL, newURL);
+      [self disableDragInteractions];
+  }
   [self.objectApi observeValueForObject:self
                                 keyPath:keyPath
                                  object:object

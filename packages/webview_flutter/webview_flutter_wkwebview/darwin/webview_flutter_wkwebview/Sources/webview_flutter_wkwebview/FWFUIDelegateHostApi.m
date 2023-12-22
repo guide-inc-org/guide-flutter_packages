@@ -189,24 +189,97 @@
                                                   }];
 }
 
+// -- Start support for js alert, confirm, prompt --
+- (UIViewController *)topViewController {
+  return [self topViewControllerWithRootViewController:[self getCurrentWindow]
+                                                           .rootViewController];
+}
+
+- (UIViewController *)topViewControllerWithRootViewController:
+    (UIViewController *)viewController {
+  if (!viewController) {
+    return nil;
+  }
+  if (viewController.presentedViewController) {
+    return [self
+        topViewControllerWithRootViewController:viewController
+                                                    .presentedViewController];
+  } else if ([viewController isKindOfClass:[UITabBarController class]]) {
+    UITabBarController *tabBarController = (UITabBarController *)viewController;
+    return [self
+        topViewControllerWithRootViewController:tabBarController
+                                                    .selectedViewController];
+  } else if ([viewController isKindOfClass:[UINavigationController class]]) {
+    UINavigationController *navigationController =
+        (UINavigationController *)viewController;
+    return [self
+        topViewControllerWithRootViewController:navigationController
+                                                    .visibleViewController];
+  } else {
+    return viewController;
+  }
+}
+
+- (UIWindow *)getCurrentWindow {
+  UIWindow *window = UIApplication.sharedApplication.keyWindow;
+  if (window.windowLevel != UIWindowLevelNormal) {
+    for (UIWindow *window in UIApplication.sharedApplication.windows) {
+      if (window.windowLevel == UIWindowLevelNormal) {
+        return window;
+      }
+    }
+  }
+  return window;
+}
+
 - (void)webView:(WKWebView *)webView
     runJavaScriptAlertPanelWithMessage:(NSString *)message
                       initiatedByFrame:(WKFrameInfo *)frame
                      completionHandler:(void (^)(void))completionHandler {
-  [self.UIDelegateAPI runJavaScriptAlertPanelForDelegateWithIdentifier:self
-                                                               message:message
-                                                                 frame:frame
-                                                     completionHandler:completionHandler];
+  // [self.UIDelegateAPI runJavaScriptAlertPanelForDelegateWithIdentifier:self
+  //                                                              message:message
+  //                                                                frame:frame
+  //                                                    completionHandler:completionHandler];
+  UIAlertController *alert =
+      [UIAlertController alertControllerWithTitle:nil
+                                          message:message
+                                   preferredStyle:UIAlertControllerStyleAlert];
+  [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"OK", nil)
+                                            style:UIAlertActionStyleCancel
+                                          handler:^(UIAlertAction *action) {
+                                            completionHandler();
+                                          }]];
+  [[self topViewController] presentViewController:alert
+                                         animated:YES
+                                       completion:nil];
 }
 
 - (void)webView:(WKWebView *)webView
     runJavaScriptConfirmPanelWithMessage:(NSString *)message
                         initiatedByFrame:(WKFrameInfo *)frame
                        completionHandler:(void (^)(BOOL))completionHandler {
-  [self.UIDelegateAPI runJavaScriptConfirmPanelForDelegateWithIdentifier:self
-                                                                 message:message
-                                                                   frame:frame
-                                                       completionHandler:completionHandler];
+  // [self.UIDelegateAPI runJavaScriptConfirmPanelForDelegateWithIdentifier:self
+  //                                                                message:message
+  //                                                                  frame:frame
+  //                                                      completionHandler:completionHandler];
+  UIAlertController *alert =
+      [UIAlertController alertControllerWithTitle:nil
+                                          message:message
+                                   preferredStyle:UIAlertControllerStyleAlert];
+  [alert
+      addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Cancel", nil)
+                                         style:UIAlertActionStyleCancel
+                                       handler:^(UIAlertAction *action) {
+                                         completionHandler(NO);
+                                       }]];
+  [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"OK", nil)
+                                            style:UIAlertActionStyleDefault
+                                          handler:^(UIAlertAction *action) {
+                                            completionHandler(YES);
+                                          }]];
+  [[self topViewController] presentViewController:alert
+                                         animated:YES
+                                       completion:nil];
 }
 
 - (void)webView:(WKWebView *)webView
@@ -214,12 +287,38 @@
                               defaultText:(NSString *)defaultText
                          initiatedByFrame:(WKFrameInfo *)frame
                         completionHandler:(void (^)(NSString *_Nullable))completionHandler {
-  [self.UIDelegateAPI runJavaScriptTextInputPanelForDelegateWithIdentifier:self
-                                                                    prompt:prompt
-                                                               defaultText:defaultText
-                                                                     frame:frame
-                                                         completionHandler:completionHandler];
+  // [self.UIDelegateAPI runJavaScriptTextInputPanelForDelegateWithIdentifier:self
+  //                                                                   prompt:prompt
+  //                                                              defaultText:defaultText
+  //                                                                    frame:frame
+  //                                                        completionHandler:completionHandler];
+  UIAlertController *alert =
+      [UIAlertController alertControllerWithTitle:nil
+                                          message:prompt
+                                   preferredStyle:UIAlertControllerStyleAlert];
+  [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
+    textField.placeholder = prompt;
+    textField.secureTextEntry = NO;
+    textField.text = defaultText;
+  }];
+  [alert
+      addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Cancel", nil)
+                                         style:UIAlertActionStyleCancel
+                                       handler:^(UIAlertAction *action) {
+                                         completionHandler(nil);
+                                       }]];
+  [alert addAction:[UIAlertAction
+                       actionWithTitle:NSLocalizedString(@"OK", nil)
+                                 style:UIAlertActionStyleDefault
+                               handler:^(UIAlertAction *action) {
+                                 completionHandler(
+                                     [alert.textFields.firstObject text]);
+                               }]];
+  [[self topViewController] presentViewController:alert
+                                         animated:YES
+                                       completion:nil];
 }
+// -- End support for js alert, confirm, prompt --
 
 @end
 
