@@ -259,9 +259,11 @@
     [[self webViewForIdentifier:identifier] setInspectable:inspectable];
 #endif
   } else {
-    *error = [FlutterError errorWithCode:@"FWFUnsupportedVersionError"
-                                 message:@"setInspectable is only supported on versions 16.4+."
-                                 details:nil];
+    [[NSUserDefaults standardUserDefaults] setBool:inspectable forKey:@"WebKitDeveloperExtras"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    // *error = [FlutterError errorWithCode:@"FWFUnsupportedVersionError"
+    //                              message:@"setInspectable is only supported on versions 16.4+."
+    //                              details:nil];
   }
 }
 
