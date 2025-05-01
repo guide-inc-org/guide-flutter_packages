@@ -25,6 +25,7 @@
     if (@available(iOS 13.0, *)) {
       self.scrollView.automaticallyAdjustsScrollIndicatorInsets = NO;
     }
+    self.allowsLinkPreview = NO;
   }
   return self;
 }
