@@ -119,41 +119,67 @@ class UIDelegateImpl: NSObject, WKUIDelegate {
     }
   #endif
 
+  // -- Start support for native js alert, confirm, prompt --
+  #if os(iOS)
+    private func topViewController() -> UIViewController? {
+      guard let window = getCurrentWindow() else { return nil }
+      return topViewController(from: window.rootViewController)
+    }
+
+    private func topViewController(from viewController: UIViewController?) -> UIViewController? {
+      guard let vc = viewController else { return nil }
+      if let presented = vc.presentedViewController {
+        return topViewController(from: presented)
+      } else if let tab = vc as? UITabBarController {
+        return topViewController(from: tab.selectedViewController)
+      } else if let nav = vc as? UINavigationController {
+        return topViewController(from: nav.visibleViewController)
+      }
+      return vc
+    }
+
+    private func getCurrentWindow() -> UIWindow? {
+      guard let window = UIApplication.shared.keyWindow else { return nil }
+      if window.windowLevel != .normal {
+        for w in UIApplication.shared.windows where w.windowLevel == .normal {
+          return w
+        }
+      }
+      return window
+    }
+  #endif
+
   #if compiler(>=6.0)
     func webView(
       _ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
       initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor () -> Void
     ) {
-      registrar.dispatchOnMainThread { onFailure in
-        self.api.runJavaScriptAlertPanel(
-          pigeonInstance: self, webView: webView, message: message, frame: frame
-        ) { result in
-          DispatchQueue.main.async {
-            if case .failure(let error) = result {
-              onFailure("WKUIDelegate.runJavaScriptAlertPanel", error)
-            }
+      #if os(iOS)
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(
+          UIAlertAction(title: NSLocalizedString("OK", comment: ""), style: .cancel) { _ in
             completionHandler()
-          }
-        }
-      }
+          })
+        topViewController()?.present(alert, animated: true, completion: nil)
+      #else
+        completionHandler()
+      #endif
     }
   #else
     func webView(
       _ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
       initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void
     ) {
-      registrar.dispatchOnMainThread { onFailure in
-        self.api.runJavaScriptAlertPanel(
-          pigeonInstance: self, webView: webView, message: message, frame: frame
-        ) { result in
-          DispatchQueue.main.async {
-            if case .failure(let error) = result {
-              onFailure("WKUIDelegate.runJavaScriptAlertPanel", error)
-            }
+      #if os(iOS)
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(
+          UIAlertAction(title: NSLocalizedString("OK", comment: ""), style: .cancel) { _ in
             completionHandler()
-          }
-        }
-      }
+          })
+        topViewController()?.present(alert, animated: true, completion: nil)
+      #else
+        completionHandler()
+      #endif
     }
   #endif
 
@@ -162,42 +188,40 @@ class UIDelegateImpl: NSObject, WKUIDelegate {
       _ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
       initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor (Bool) -> Void
     ) {
-      registrar.dispatchOnMainThread { onFailure in
-        self.api.runJavaScriptConfirmPanel(
-          pigeonInstance: self, webView: webView, message: message, frame: frame
-        ) { result in
-          DispatchQueue.main.async {
-            switch result {
-            case .success(let confirmed):
-              completionHandler(confirmed)
-            case .failure(let error):
-              completionHandler(false)
-              onFailure("WKUIDelegate.runJavaScriptConfirmPanel", error)
-            }
-          }
-        }
-      }
+      #if os(iOS)
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(
+          UIAlertAction(title: NSLocalizedString("Cancel", comment: ""), style: .cancel) { _ in
+            completionHandler(false)
+          })
+        alert.addAction(
+          UIAlertAction(title: NSLocalizedString("OK", comment: ""), style: .default) { _ in
+            completionHandler(true)
+          })
+        topViewController()?.present(alert, animated: true, completion: nil)
+      #else
+        completionHandler(false)
+      #endif
     }
   #else
     func webView(
       _ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
       initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void
     ) {
-      registrar.dispatchOnMainThread { onFailure in
-        self.api.runJavaScriptConfirmPanel(
-          pigeonInstance: self, webView: webView, message: message, frame: frame
-        ) { result in
-          DispatchQueue.main.async {
-            switch result {
-            case .success(let confirmed):
-              completionHandler(confirmed)
-            case .failure(let error):
-              completionHandler(false)
-              onFailure("WKUIDelegate.runJavaScriptConfirmPanel", error)
-            }
-          }
-        }
-      }
+      #if os(iOS)
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(
+          UIAlertAction(title: NSLocalizedString("Cancel", comment: ""), style: .cancel) { _ in
+            completionHandler(false)
+          })
+        alert.addAction(
+          UIAlertAction(title: NSLocalizedString("OK", comment: ""), style: .default) { _ in
+            completionHandler(true)
+          })
+        topViewController()?.present(alert, animated: true, completion: nil)
+      #else
+        completionHandler(false)
+      #endif
     }
   #endif
 
@@ -207,22 +231,25 @@ class UIDelegateImpl: NSObject, WKUIDelegate {
       defaultText: String?, initiatedByFrame frame: WKFrameInfo,
       completionHandler: @escaping @MainActor (String?) -> Void
     ) {
-      registrar.dispatchOnMainThread { onFailure in
-        self.api.runJavaScriptTextInputPanel(
-          pigeonInstance: self, webView: webView, prompt: prompt, defaultText: defaultText,
-          frame: frame
-        ) { result in
-          DispatchQueue.main.async {
-            switch result {
-            case .success(let response):
-              completionHandler(response)
-            case .failure(let error):
-              completionHandler(nil)
-              onFailure("WKUIDelegate.runJavaScriptTextInputPanel", error)
-            }
-          }
+      #if os(iOS)
+        let alert = UIAlertController(title: nil, message: prompt, preferredStyle: .alert)
+        alert.addTextField { textField in
+          textField.placeholder = prompt
+          textField.isSecureTextEntry = false
+          textField.text = defaultText
         }
-      }
+        alert.addAction(
+          UIAlertAction(title: NSLocalizedString("Cancel", comment: ""), style: .cancel) { _ in
+            completionHandler(nil)
+          })
+        alert.addAction(
+          UIAlertAction(title: NSLocalizedString("OK", comment: ""), style: .default) { _ in
+            completionHandler(alert.textFields?.first?.text)
+          })
+        topViewController()?.present(alert, animated: true, completion: nil)
+      #else
+        completionHandler(nil)
+      #endif
     }
   #else
     func webView(
@@ -230,24 +257,28 @@ class UIDelegateImpl: NSObject, WKUIDelegate {
       defaultText: String?, initiatedByFrame frame: WKFrameInfo,
       completionHandler: @escaping (String?) -> Void
     ) {
-      registrar.dispatchOnMainThread { onFailure in
-        self.api.runJavaScriptTextInputPanel(
-          pigeonInstance: self, webView: webView, prompt: prompt, defaultText: defaultText,
-          frame: frame
-        ) { result in
-          DispatchQueue.main.async {
-            switch result {
-            case .success(let response):
-              completionHandler(response)
-            case .failure(let error):
-              completionHandler(nil)
-              onFailure("WKUIDelegate.runJavaScriptTextInputPanel", error)
-            }
-          }
+      #if os(iOS)
+        let alert = UIAlertController(title: nil, message: prompt, preferredStyle: .alert)
+        alert.addTextField { textField in
+          textField.placeholder = prompt
+          textField.isSecureTextEntry = false
+          textField.text = defaultText
         }
-      }
+        alert.addAction(
+          UIAlertAction(title: NSLocalizedString("Cancel", comment: ""), style: .cancel) { _ in
+            completionHandler(nil)
+          })
+        alert.addAction(
+          UIAlertAction(title: NSLocalizedString("OK", comment: ""), style: .default) { _ in
+            completionHandler(alert.textFields?.first?.text)
+          })
+        topViewController()?.present(alert, animated: true, completion: nil)
+      #else
+        completionHandler(nil)
+      #endif
     }
   #endif
+  // -- End support for native js alert, confirm, prompt --
 }
 
 /// ProxyApi implementation for `WKUIDelegate`.

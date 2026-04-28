@@ -4,6 +4,11 @@
 
 import WebKit
 
+// Shared WKProcessPool singleton to share cookies across webviews
+class SharedWKProcessPool {
+  static let shared = WKProcessPool()
+}
+
 class WebViewImpl: WKWebView {
   let api: PigeonApiProtocolWKWebView
   unowned let registrar: ProxyAPIRegistrar
@@ -14,10 +19,13 @@ class WebViewImpl: WKWebView {
   ) {
     self.api = api
     self.registrar = registrar
+    configuration.processPool = SharedWKProcessPool.shared
     super.init(frame: frame, configuration: configuration)
     #if os(iOS)
       scrollView.contentInsetAdjustmentBehavior = .never
       scrollView.automaticallyAdjustsScrollIndicatorInsets = false
+      allowsLinkPreview = false
+      scrollView.bounces = false
     #endif
   }
 
@@ -25,10 +33,34 @@ class WebViewImpl: WKWebView {
     fatalError("init(coder:) has not been implemented")
   }
 
+  #if os(iOS)
+    private func disableDragInteractions() {
+      guard let webScrollView = subviews.first(where: { $0 is UIScrollView }) else { return }
+      guard let contentView = webScrollView.subviews.first(where: { $0.interactions.count > 1 })
+      else { return }
+      for interaction in contentView.interactions {
+        if let drag = interaction as? UIDragInteraction {
+          drag.isEnabled = false
+          break
+        }
+      }
+    }
+  #endif
+
   override func observeValue(
     forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey: Any]?,
     context: UnsafeMutableRawPointer?
   ) {
+    #if os(iOS)
+      if keyPath == "URL",
+        let oldURL = change?[.oldKey] as? URL,
+        let newURL = change?[.newKey] as? URL,
+        oldURL != newURL
+      {
+        disableDragInteractions()
+      }
+    #endif
+
     NSObjectImpl.handleObserveValue(
       withApi: (api as! PigeonApiWKWebView).pigeonApiNSObject, registrar: registrar,
       instance: self as NSObject,
