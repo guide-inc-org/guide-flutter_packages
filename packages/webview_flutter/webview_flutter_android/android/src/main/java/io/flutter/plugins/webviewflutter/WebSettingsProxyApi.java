@@ -73,6 +73,7 @@ public class WebSettingsProxyApi extends PigeonApiWebSettings {
 
   @Override
   public void setBuiltInZoomControls(@NonNull WebSettings pigeon_instance, boolean enabled) {
+    pigeon_instance.setMinimumFontSize(1);
     pigeon_instance.setBuiltInZoomControls(enabled);
   }
 
