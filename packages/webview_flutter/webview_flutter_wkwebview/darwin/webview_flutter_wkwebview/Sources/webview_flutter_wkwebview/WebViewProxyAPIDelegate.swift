@@ -45,6 +45,15 @@ class WebViewImpl: WKWebView {
         }
       }
     }
+
+    // WKContentView installs its interactions (incl. drag) only once the web view is in a window,
+    // which happens after the first "URL" change. Without this, the first page stays draggable.
+    override func didMoveToWindow() {
+      super.didMoveToWindow()
+      if window != nil {
+        disableDragInteractions()
+      }
+    }
   #endif
 
   override func observeValue(
@@ -52,10 +61,10 @@ class WebViewImpl: WKWebView {
     context: UnsafeMutableRawPointer?
   ) {
     #if os(iOS)
+      // The Dart side observes "URL" with `.new` only, so `.oldKey` is always nil here.
+      // Do not require it: compare optionals, as the original Obj-C patch did.
       if keyPath == "URL",
-        let oldURL = change?[.oldKey] as? URL,
-        let newURL = change?[.newKey] as? URL,
-        oldURL != newURL
+        change?[.newKey] as? URL != change?[.oldKey] as? URL
       {
         disableDragInteractions()
       }
